@@ -103,5 +103,11 @@ struct proc {
   struct context context;      // swtch() here to run process
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
-  char name[16];               // Process name (debugging)
+  char name[16];
+  int priority;               // Current priority level (0, 1, or 2)
+  int ticks_count;            // Ticks consumed in current priority level
+
+               // Process name (debugging)
 };
+
+

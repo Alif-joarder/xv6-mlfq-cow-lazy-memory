@@ -81,8 +81,26 @@ usertrap(void)
     kexit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
-    yield();
+ // MLFQ Time Quantum and Demotion Logic
+  if(which_dev == 2){
+    struct proc *p = myproc();
+    if(p && p->state == RUNNING){
+      p->ticks_count++;
+      
+      // Level 0: 1 tick, Level 1: 2 ticks, Level 2: 4 ticks
+      if((p->priority == 0 && p->ticks_count >= 1) ||
+         (p->priority == 1 && p->ticks_count >= 2) ||
+         (p->priority == 2 && p->ticks_count >= 4)) {
+        
+        p->ticks_count = 0; // Reset ticks
+        if(p->priority < 2) {
+          p->priority++; // Demote to lower priority
+          printf("Process PID: %d demoted to Priority Level: %d\n", p->pid, p->priority);
+        }
+        yield();
+      }
+    }
+  }
 
   prepare_return();
 
@@ -152,8 +170,26 @@ kerneltrap()
   }
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2 && myproc() != 0)
-    yield();
+  // MLFQ Time Quantum and Demotion Logic
+  if(which_dev == 2){
+    struct proc *p = myproc();
+    if(p && p->state == RUNNING){
+      p->ticks_count++;
+      
+      // Level 0: 1 tick, Level 1: 2 ticks, Level 2: 4 ticks
+      if((p->priority == 0 && p->ticks_count >= 1) ||
+         (p->priority == 1 && p->ticks_count >= 2) ||
+         (p->priority == 2 && p->ticks_count >= 4)) {
+        
+        p->ticks_count = 0; // Reset ticks
+        if(p->priority < 2) {
+          p->priority++; // Demote to lower priority
+          printf("Process PID: %d demoted to Priority Level: %d\n", p->pid, p->priority);
+        }
+        yield();
+      }
+    }
+  }
 
   // the yield() may have caused some traps to occur,
   // so restore trap registers for use by kernelvec.S's sepc instruction.

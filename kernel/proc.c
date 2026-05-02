@@ -114,6 +114,11 @@ allocproc(void)
   for(p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
     if(p->state == UNUSED) {
+
+p->priority = 0;      // নতুন প্রসেস লেভেল ০-তে থাকবে
+p->ticks_count = 0;   // তার ব্যবহৃত সময় ০ থেকে শুরু হবে
+
+
       goto found;
     } else {
       release(&p->lock);
@@ -421,46 +426,62 @@ kwait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
-void
+  
+  void
 scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-
+  
   c->proc = 0;
   for(;;){
-    // The most recent process to run may have had interrupts
-    // turned off; enable them to avoid a deadlock if all
-    // processes are waiting. Then turn them back off
-    // to avoid a possible race between an interrupt
-    // and wfi.
+    // Enable interrupts on this processor.
     intr_on();
-    intr_off();
 
-    int found = 0;
+    int found = 0; // Flag to check if we found a process
+
+    // Level 0 Priority (Highest)
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
+      if(p->state == RUNNABLE && p->priority == 0) {
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
         c->proc = 0;
         found = 1;
       }
       release(&p->lock);
     }
-    if(found == 0) {
-      // nothing to run; stop running on this core until an interrupt.
-      asm volatile("wfi");
+    if(found) continue;
+
+    // Level 1 Priority
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE && p->priority == 1) {
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+        c->proc = 0;
+        found = 1;
+      }
+      release(&p->lock);
+    }
+    if(found) continue;
+
+    // Level 2 Priority (Lowest)
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE && p->priority == 2) {
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+        c->proc = 0;
+      }
+      release(&p->lock);
     }
   }
 }
+        
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
